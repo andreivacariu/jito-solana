@@ -193,6 +193,8 @@ impl ImmutableDeserializedBundle {
 
 #[cfg(test)]
 mod tests {
+    use solana_sdk::instruction::Instruction;
+    use solana_sdk::transaction::Transaction;
     use {
         crate::{
             immutable_deserialized_bundle::{DeserializedBundleError, ImmutableDeserializedBundle},
@@ -215,6 +217,7 @@ mod tests {
         solana_svm::transaction_error_metrics::TransactionErrorMetrics,
         std::{collections::HashSet, sync::Arc},
     };
+
     /// Happy case
     #[test]
     fn test_simple_get_sanitized_bundle() {
@@ -529,6 +532,90 @@ mod tests {
                 false
             ),
             Err(DeserializedBundleError::FailedCheckTransactions)
+        );
+    }
+
+    #[test]
+    fn test_bad_ed25519_program_precompile() {
+        let GenesisConfigInfo {
+            genesis_config,
+            mint_keypair,
+            ..
+        } = create_genesis_config(10_000);
+        let (bank, _) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);
+
+        let tx = Transaction::new_signed_with_payer(
+            &[Instruction {
+                program_id: solana_sdk::ed25519_program::id(),
+                accounts: vec![],
+                data: vec![], // empty data is invalid
+            }],
+            Some(&mint_keypair.pubkey()),
+            &[&mint_keypair],
+            genesis_config.hash(),
+        );
+
+        let bundle = ImmutableDeserializedBundle::new(
+            &mut PacketBundle {
+                batch: PacketBatch::new(vec![Packet::from_data(None, tx).unwrap()]),
+                bundle_id: String::default(),
+            },
+            None,
+            &Ok,
+        )
+        .unwrap();
+
+        let mut transaction_errors = TransactionErrorMetrics::default();
+        assert_matches!(
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
+            Err(DeserializedBundleError::FailedVerifyPrecompiles)
+        );
+    }
+
+    #[test]
+    fn test_bad_secp256k1_program_precompile() {
+        let GenesisConfigInfo {
+            genesis_config,
+            mint_keypair,
+            ..
+        } = create_genesis_config(10_000);
+        let (bank, _) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);
+
+        let tx = Transaction::new_signed_with_payer(
+            &[Instruction {
+                program_id: solana_sdk::secp256k1_program::id(),
+                accounts: vec![],
+                data: vec![], // empty data is invalid
+            }],
+            Some(&mint_keypair.pubkey()),
+            &[&mint_keypair],
+            genesis_config.hash(),
+        );
+
+        let bundle = ImmutableDeserializedBundle::new(
+            &mut PacketBundle {
+                batch: PacketBatch::new(vec![Packet::from_data(None, tx).unwrap()]),
+                bundle_id: String::default(),
+            },
+            None,
+            &Ok,
+        )
+        .unwrap();
+
+        let mut transaction_errors = TransactionErrorMetrics::default();
+        assert_matches!(
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
+            Err(DeserializedBundleError::FailedVerifyPrecompiles)
         );
     }
 }
