@@ -193,8 +193,6 @@ impl ImmutableDeserializedBundle {
 
 #[cfg(test)]
 mod tests {
-    use solana_sdk::instruction::Instruction;
-    use solana_sdk::transaction::Transaction;
     use {
         crate::{
             immutable_deserialized_bundle::{DeserializedBundleError, ImmutableDeserializedBundle},
@@ -209,10 +207,12 @@ mod tests {
         },
         solana_sdk::{
             hash::Hash,
+            instruction::Instruction,
             packet::Packet,
             pubkey::Pubkey,
             signature::{Keypair, Signer},
             system_transaction::transfer,
+            transaction::Transaction,
         },
         solana_svm::transaction_error_metrics::TransactionErrorMetrics,
         std::{collections::HashSet, sync::Arc},
