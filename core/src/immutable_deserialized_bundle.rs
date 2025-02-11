@@ -8,7 +8,7 @@ use {
     },
     solana_bundle::SanitizedBundle,
     solana_perf::sigverify::verify_packet,
-    solana_runtime::bank::Bank,
+    solana_runtime::{bank::Bank, verify_precompiles::verify_precompiles},
     solana_sdk::{
         clock::MAX_PROCESSING_AGE, pubkey::Pubkey, signature::Signature,
         transaction::SanitizedTransaction,
@@ -55,6 +55,9 @@ pub enum DeserializedBundleError {
 
     #[error("PacketFilterFailure: {0}")]
     PacketFilterFailure(#[from] PacketFilterFailure),
+
+    #[error("Failed to verify precompiles")]
+    FailedVerifyPrecompiles,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -121,6 +124,7 @@ impl ImmutableDeserializedBundle {
         bank: &Bank,
         blacklisted_accounts: &HashSet<Pubkey>,
         transaction_error_metrics: &mut TransactionErrorMetrics,
+        move_precompile_verification_to_svm: bool,
     ) -> Result<SanitizedBundle, DeserializedBundleError> {
         if bank.vote_only_bank() {
             return Err(DeserializedBundleError::VoteOnlyMode);
@@ -171,6 +175,13 @@ impl ImmutableDeserializedBundle {
 
         if check_results.iter().any(|r| r.is_err()) {
             return Err(DeserializedBundleError::FailedCheckTransactions);
+        }
+
+        if !move_precompile_verification_to_svm {
+            for tx in &transactions {
+                verify_precompiles(tx, &bank.feature_set)
+                    .map_err(|_| DeserializedBundleError::FailedVerifyPrecompiles)?;
+            }
         }
 
         Ok(SanitizedBundle {
@@ -235,7 +246,7 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         let sanitized_bundle = bundle
-            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors)
+            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors, false)
             .unwrap();
         assert_eq!(sanitized_bundle.transactions.len(), 2);
         assert_eq!(
@@ -369,7 +380,8 @@ mod tests {
             bundle.build_sanitized_bundle(
                 &vote_only_bank,
                 &HashSet::default(),
-                &mut transaction_errors
+                &mut transaction_errors,
+                false
             ),
             Err(DeserializedBundleError::VoteOnlyMode)
         );
@@ -403,7 +415,12 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::DuplicateTransaction)
         );
     }
@@ -436,7 +453,8 @@ mod tests {
             bundle.build_sanitized_bundle(
                 &bank,
                 &HashSet::from([kp.pubkey()]),
-                &mut transaction_errors
+                &mut transaction_errors,
+                false
             ),
             Err(DeserializedBundleError::BlacklistedAccount)
         );
@@ -469,7 +487,12 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::FailedCheckTransactions)
         );
     }
@@ -499,7 +522,12 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::FailedCheckTransactions)
         );
     }
