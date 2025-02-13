@@ -53,7 +53,7 @@ impl<'a, 'b> LockedBundle<'a, 'b> {
 }
 
 // Automatically unlock bundle accounts when destructed
-impl<'a, 'b> Drop for LockedBundle<'a, 'b> {
+impl Drop for LockedBundle<'_, '_> {
     fn drop(&mut self) {
         let _ = self
             .bundle_account_locker

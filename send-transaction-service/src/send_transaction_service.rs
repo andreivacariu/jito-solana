@@ -6,7 +6,6 @@ pub use crate::{
     send_transaction_service_stats::SendTransactionServiceStats,
     transaction_client::{CurrentLeaderInfo, LEADER_INFO_REFRESH_RATE_MS},
 };
-use solana_gossip::cluster_info::ClusterInfo;
 use {
     crate::{
         send_transaction_service_stats::SendTransactionServiceStatsReport,
@@ -17,6 +16,7 @@ use {
     itertools::Itertools,
     log::*,
     solana_client::connection_cache::ConnectionCache,
+    solana_gossip::cluster_info::ClusterInfo,
     solana_runtime::{bank::Bank, bank_forks::BankForks},
     solana_sdk::{
         hash::Hash, nonce_account, pubkey::Pubkey, saturating_add_assign, signature::Signature,

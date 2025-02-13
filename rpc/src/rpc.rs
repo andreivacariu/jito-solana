@@ -3623,7 +3623,6 @@ pub mod utils {
 // Full RPC interface that an API node is expected to provide
 // (rpc_minimal should also be provided by an API node)
 pub mod rpc_full {
-    use solana_bundle_sdk::derive_bundle_id;
     use {
         super::*,
         crate::rpc::utils::{account_configs_to_accounts, rpc_bundle_result_from_bank_result},
@@ -3632,6 +3631,7 @@ pub mod rpc_full {
             bundle_execution::{load_and_execute_bundle, LoadAndExecuteBundleError},
             SanitizedBundle,
         },
+        solana_bundle_sdk::derive_bundle_id,
         solana_rpc_client_api::bundles::{
             RpcBundleRequest, RpcSimulateBundleConfig, RpcSimulateBundleResult,
             SimulationSlotConfig,

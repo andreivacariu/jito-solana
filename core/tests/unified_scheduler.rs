@@ -1,4 +1,3 @@
-use solana_poh::poh_recorder::WorkingBankEntry;
 use {
     agave_banking_stage_ingress_types::BankingPacketBatch,
     assert_matches::assert_matches,
@@ -25,7 +24,7 @@ use {
         genesis_utils::create_genesis_config, leader_schedule_cache::LeaderScheduleCache,
     },
     solana_perf::packet::to_packet_batches,
-    solana_poh::poh_recorder::create_test_recorder,
+    solana_poh::poh_recorder::{create_test_recorder, WorkingBankEntry},
     solana_runtime::{
         accounts_background_service::AbsRequestSender, bank::Bank, bank_forks::BankForks,
         genesis_utils::GenesisConfigInfo, installed_scheduler_pool::SchedulingContext,

@@ -1,6 +1,8 @@
-use serde::{Deserialize, Serialize};
 use {
-    digest::Digest, itertools::Itertools, sha2::Sha256,
+    digest::Digest,
+    itertools::Itertools,
+    serde::{Deserialize, Serialize},
+    sha2::Sha256,
     solana_sdk::transaction::VersionedTransaction,
 };
 
