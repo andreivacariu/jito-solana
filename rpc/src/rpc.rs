@@ -462,7 +462,7 @@ impl JsonRpcRequestProcessor {
         });
         let (transaction_sender, transaction_receiver) = unbounded();
         SendTransactionService::new::<NullTpuInfo>(
-            tpu_address,
+            cluster_info.clone(),
             &bank_forks,
             None,
             transaction_receiver,
@@ -7123,7 +7123,7 @@ pub mod tests {
             service_runtime(rpc_threads, rpc_blocking_threads, rpc_niceness_adj),
         );
         SendTransactionService::new::<NullTpuInfo>(
-            tpu_address,
+            cluster_info,
             &bank_forks,
             None,
             receiver,
@@ -7403,7 +7403,7 @@ pub mod tests {
             service_runtime(rpc_threads, rpc_blocking_threads, rpc_niceness_adj),
         );
         SendTransactionService::new::<NullTpuInfo>(
-            tpu_address,
+            cluster_info,
             &bank_forks,
             None,
             receiver,

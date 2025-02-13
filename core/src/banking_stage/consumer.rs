@@ -1186,12 +1186,18 @@ mod tests {
 
         let mut done = false;
         // read entries until I find mine, might be ticks...
-        while let Ok((_bank, (entry, _tick_height))) = entry_receiver.recv() {
-            if !entry.is_tick() {
-                trace!("got entry");
-                assert_eq!(entry.transactions.len(), transactions.len());
-                assert_eq!(bank.get_balance(&pubkey), 1);
-                done = true;
+        while let Ok(WorkingBankEntry {
+            bank: _,
+            entries_ticks,
+        }) = entry_receiver.recv()
+        {
+            for (entry, _) in entries_ticks {
+                if !entry.is_tick() {
+                    trace!("got entry");
+                    assert_eq!(entry.transactions.len(), transactions.len());
+                    assert_eq!(bank.get_balance(&pubkey), 1);
+                    done = true;
+                }
             }
             if done {
                 break;
@@ -1209,7 +1215,7 @@ mod tests {
         )]);
 
         let process_transactions_batch_output =
-            consumer.process_and_record_transactions(&bank, &transactions, 0);
+            consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
 
         let ExecuteAndCommitTransactionsOutput {
             transaction_counts,
@@ -1304,11 +1310,10 @@ mod tests {
                     let timeout = Duration::from_millis(10);
                     let record = record_receiver.recv_timeout(timeout);
                     if let Ok(record) = record {
-                        let record_response = poh_recorder.write().unwrap().record(
-                            record.slot,
-                            record.mixin,
-                            record.transactions,
-                        );
+                        let record_response = poh_recorder
+                            .write()
+                            .unwrap()
+                            .record(record.slot, &record.mixins_txs);
                         poh_recorder.write().unwrap().tick();
                         if record.sender.send(record_response).is_err() {
                             panic!("Error returning mixin hash");
@@ -1345,10 +1350,17 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         let process_transactions_batch_output =
-            consumer.process_and_record_transactions(&bank, &transactions, 0);
+            consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
         let ExecuteAndCommitTransactionsOutput {
             transaction_counts,
             commit_transactions_result,
@@ -1373,10 +1385,19 @@ mod tests {
 
         let mut done = false;
         // read entries until I find mine, might be ticks...
-        while let Ok((_bank, (entry, _tick_height))) = entry_receiver.recv() {
-            if !entry.is_tick() {
-                assert_eq!(entry.transactions.len(), transactions.len());
-                done = true;
+        while let Ok(WorkingBankEntry {
+            bank: _,
+            entries_ticks,
+        }) = entry_receiver.recv()
+        {
+            for (entry, _) in entries_ticks {
+                if !entry.is_tick() {
+                    assert_eq!(entry.transactions.len(), transactions.len());
+                    done = true;
+                    break;
+                }
+            }
+            if done {
                 break;
             }
         }
@@ -1446,10 +1467,17 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         let process_transactions_batch_output =
-            consumer.process_and_record_transactions(&bank, &transactions, 0);
+            consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
 
         let ExecuteAndCommitTransactionsOutput {
             transaction_counts,
@@ -1522,7 +1550,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         let get_block_cost = || bank.read_cost_tracker().unwrap().block_cost();
         let get_tx_count = || bank.read_cost_tracker().unwrap().transaction_count();
@@ -1541,7 +1576,7 @@ mod tests {
         )]);
 
         let process_transactions_batch_output =
-            consumer.process_and_record_transactions(&bank, &transactions, 0);
+            consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
 
         let ExecuteAndCommitTransactionsOutput {
             transaction_counts,
@@ -1681,7 +1716,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         let process_transactions_batch_output =
             consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
@@ -1883,7 +1925,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder.clone(), QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder.clone(),
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         let process_transactions_summary =
             consumer.process_transactions(&bank, &Instant::now(), &transactions, &|_| 0);
@@ -2009,9 +2058,16 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
-        let _ = consumer.process_and_record_transactions(&bank, &transactions, 0);
+        let _ = consumer.process_and_record_transactions(&bank, &transactions, 0, &|_| 0);
 
         drop(consumer); // drop/disconnect transaction_status_sender
 
@@ -2153,9 +2209,16 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
-        let _ = consumer.process_and_record_transactions(&bank, &[sanitized_tx.clone()], 0);
+        let _ = consumer.process_and_record_transactions(&bank, &[sanitized_tx.clone()], 0, &|_| 0);
 
         drop(consumer); // drop/disconnect transaction_status_sender
 
@@ -2207,7 +2270,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         // When the working bank in poh_recorder is None, no packets should be processed (consume will not be called)
         assert!(!poh_recorder.read().unwrap().has_bank());
@@ -2279,7 +2349,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         // When the working bank in poh_recorder is None, no packets should be processed
         assert!(!poh_recorder.read().unwrap().has_bank());
@@ -2293,6 +2370,7 @@ mod tests {
             &mut buffered_packet_batches,
             &BankingStageStats::default(),
             &mut LeaderSlotMetricsTracker::new(0),
+            &|_| 0,
         );
         assert!(buffered_packet_batches.is_empty());
         poh_recorder
@@ -2324,7 +2402,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         // When the working bank in poh_recorder is None, no packets should be processed (consume will not be called)
         assert!(!poh_recorder.read().unwrap().has_bank());
@@ -2445,7 +2530,14 @@ mod tests {
             replay_vote_sender,
             Arc::new(PrioritizationFeeCache::new(0u64)),
         );
-        let consumer = Consumer::new(committer, recorder, QosService::new(1), None);
+        let consumer = Consumer::new(
+            committer,
+            recorder,
+            QosService::new(1),
+            None,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+        );
 
         // When the working bank in poh_recorder is None, no packets should be processed (consume will not be called)
         assert!(!poh_recorder.read().unwrap().has_bank());
@@ -2460,6 +2552,7 @@ mod tests {
             &mut buffered_packet_batches,
             &banking_stage_stats,
             &mut LeaderSlotMetricsTracker::new(0),
+            &|_| 0,
         );
 
         // Check that all packets were processed without retrying

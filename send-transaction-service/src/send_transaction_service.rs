@@ -574,8 +574,17 @@ mod test {
             last_sent_time: None,
         };
 
+        let cluster_info = Arc::new({
+            let keypair = Arc::new(Keypair::new());
+            let contact_info = ContactInfo::new_with_socketaddr(
+                &keypair.pubkey(),
+                &socketaddr!(Ipv4Addr::LOCALHOST, 1234),
+            );
+            ClusterInfo::new(contact_info, keypair, SocketAddrSpace::Unspecified)
+        });
+
         let exit = Arc::new(AtomicBool::new(false));
-        let client = C::create_client(maybe_runtime, "127.0.0.1:0".parse().unwrap(), None, 1);
+        let client = C::create_client(maybe_runtime, cluster_info, None, 1);
         let _send_transaction_service = SendTransactionService::new_with_client(
             &bank_forks,
             receiver,
@@ -680,7 +689,7 @@ mod test {
 
         let client = C::create_client(
             maybe_runtime,
-            "127.0.0.1:0".parse().unwrap(),
+            cluster_info,
             config.tpu_peers.clone(),
             leader_forward_count,
         );
@@ -964,7 +973,7 @@ mod test {
         ));
         let client = C::create_client(
             maybe_runtime,
-            "127.0.0.1:0".parse().unwrap(),
+            cluster_info,
             config.tpu_peers.clone(),
             leader_forward_count,
         );

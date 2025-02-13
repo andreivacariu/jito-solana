@@ -42,27 +42,6 @@ impl CreateClient for ConnectionCacheClient<NullTpuInfo> {
         )
     }
 }
-
-impl CreateClient for TpuClientNextClient<NullTpuInfo> {
-    fn create_client(
-        maybe_runtime: Option<Handle>,
-        cluster_info: Arc<ClusterInfo>,
-        tpu_peers: Option<Vec<SocketAddr>>,
-        leader_forward_count: u64,
-    ) -> Self {
-        let runtime_handle =
-            maybe_runtime.expect("Runtime should be provided for the TpuClientNextClient.");
-        Self::new(
-            runtime_handle,
-            cluster_info,
-            tpu_peers,
-            None,
-            leader_forward_count,
-            None,
-        )
-    }
-}
-
 pub trait Cancelable {
     fn cancel(&self);
 }

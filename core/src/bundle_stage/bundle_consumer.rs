@@ -730,6 +730,7 @@ mod tests {
         jito_tip_distribution::sdk::derive_tip_distribution_account_address,
         rand::{thread_rng, RngCore},
         solana_bundle::SanitizedBundle,
+        solana_bundle_sdk::derive_bundle_id,
         solana_cost_model::cost_model::CostModel,
         solana_gossip::{cluster_info::ClusterInfo, contact_info::ContactInfo},
         solana_ledger::{
@@ -751,7 +752,6 @@ mod tests {
         },
         solana_runtime_transaction::runtime_transaction::RuntimeTransaction,
         solana_sdk::{
-            bundle::derive_bundle_id,
             clock::MAX_PROCESSING_AGE,
             fee_calculator::{FeeRateGovernor, DEFAULT_TARGET_LAMPORTS_PER_SIGNATURE},
             genesis_config::ClusterType,

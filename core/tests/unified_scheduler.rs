@@ -1,3 +1,4 @@
+use solana_poh::poh_recorder::WorkingBankEntry;
 use {
     agave_banking_stage_ingress_types::BankingPacketBatch,
     assert_matches::assert_matches,
@@ -18,7 +19,6 @@ use {
         replay_stage::ReplayStage,
         unfrozen_gossip_verified_vote_hashes::UnfrozenGossipVerifiedVoteHashes,
     },
-    solana_entry::entry::Entry,
     solana_gossip::cluster_info::{ClusterInfo, Node},
     solana_ledger::{
         blockstore::Blockstore, create_new_tmp_ledger_auto_delete,
@@ -288,9 +288,18 @@ fn test_scheduler_producing_blocks() {
 
     // Verify transactions are committed and poh-recorded
     assert_eq!(tpu_bank.transaction_count(), 1);
-    assert_matches!(
-        signal_receiver.into_iter().find(|(_, (entry, _))| !entry.is_tick()),
-        Some((_, (Entry {transactions, ..}, _))) if transactions == [tx.to_versioned_transaction()]
+    let wbe = signal_receiver
+        .into_iter()
+        .find(
+            |WorkingBankEntry {
+                 bank: _,
+                 entries_ticks,
+             }| !entries_ticks[0].0.is_tick(),
+        )
+        .unwrap();
+    assert_eq!(
+        wbe.entries_ticks[0].0.transactions,
+        [tx.to_versioned_transaction()]
     );
 
     // Stop things.

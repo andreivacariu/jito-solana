@@ -1062,6 +1062,9 @@ mod tests {
             bank_forks,
             &Arc::new(PrioritizationFeeCache::new(0u64)),
             false,
+            HashSet::default(),
+            BundleAccountLocker::default(),
+            |_| 0,
         );
         trace!("sending bank");
         drop(non_vote_sender);
@@ -1353,7 +1356,13 @@ mod tests {
         // check that the balance is what we expect.
         let entries: Vec<_> = entry_receiver
             .iter()
-            .map(|(_bank, (entry, _tick_height))| entry)
+            .map(
+                |WorkingBankEntry {
+                     bank: _,
+                     entries_ticks,
+                 }| entries_ticks.into_iter().map(|e| e.0),
+            )
+            .flatten()
             .collect();
 
         let (bank, _bank_forks) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);
@@ -1412,14 +1421,20 @@ mod tests {
             system_transaction::transfer(&keypair2, &pubkey2, 1, genesis_config.hash()).into(),
         ];
 
-        let _ = recorder.record_transactions(bank.slot(), txs.clone());
-        let (_bank, (entry, _tick_height)) = entry_receiver.recv().unwrap();
+        let _ = recorder.record_transactions(bank.slot(), vec![txs.clone()]);
+        let WorkingBankEntry {
+            bank,
+            entries_ticks,
+        } = entry_receiver.recv().unwrap();
+        assert_eq!(entries_ticks.len(), 1);
+        let entry = &entries_ticks[0].0;
         assert_eq!(entry.transactions, txs);
 
         // Once bank is set to a new bank (setting bank.slot() + 1 in record_transactions),
         // record_transactions should throw MaxHeightReached
         let next_slot = bank.slot() + 1;
-        let RecordTransactionsSummary { result, .. } = recorder.record_transactions(next_slot, txs);
+        let RecordTransactionsSummary { result, .. } =
+            recorder.record_transactions(next_slot, vec![txs]);
         assert_matches!(result, Err(PohRecorderError::MaxHeightReached));
         // Should receive nothing from PohRecorder b/c record failed
         assert!(entry_receiver.try_recv().is_err());

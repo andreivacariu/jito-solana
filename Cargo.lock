@@ -7603,6 +7603,7 @@ dependencies = [
  "solana-bloom",
  "solana-builtins-default-costs",
  "solana-bundle",
+ "solana-bundle-sdk",
  "solana-client",
  "solana-compute-budget",
  "solana-compute-budget-instruction",
