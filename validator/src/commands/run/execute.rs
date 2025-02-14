@@ -1,3 +1,7 @@
+use solana_core::proxy::block_engine_stage::BlockEngineConfig;
+use solana_core::proxy::relayer_stage::RelayerConfig;
+use solana_core::tip_manager::{TipDistributionAccountConfig, TipManagerConfig};
+use std::sync::Mutex;
 use {
     crate::{
         admin_rpc_service,
@@ -794,6 +798,12 @@ pub fn execute(
             .is_present("delay_leader_block_for_pending_fork"),
         wen_restart_proto_path: value_t!(matches, "wen_restart", PathBuf).ok(),
         wen_restart_coordinator: value_t!(matches, "wen_restart_coordinator", Pubkey).ok(),
+        // pub relayer_config: Arc<Mutex<RelayerConfig>>,
+        // pub block_engine_config: Arc<Mutex<BlockEngineConfig>>,
+        // pub shred_receiver_address: Arc<RwLock<Option<SocketAddr>>>,
+        // pub shred_retransmit_receiver_address: Arc<RwLock<Option<SocketAddr>>>,
+        // pub tip_manager_config: TipManagerConfig,
+        // pub preallocated_bundle_cost: u64,
         ..ValidatorConfig::default()
     };
 
@@ -1486,5 +1496,49 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
     AccountSecondaryIndexes {
         keys,
         indexes: account_indexes,
+    }
+}
+
+fn tip_manager_config_from_matches(
+    matches: &ArgMatches,
+    voting_disabled: bool,
+) -> TipManagerConfig {
+    TipManagerConfig {
+        tip_payment_program_id: pubkey_of(matches, "tip_payment_program_pubkey").unwrap_or_else(
+            || {
+                if !voting_disabled {
+                    panic!("--tip-payment-program-pubkey argument required when validator is voting");
+                }
+                Pubkey::new_unique()
+            },
+        ),
+        tip_distribution_program_id: pubkey_of(matches, "tip_distribution_program_pubkey")
+            .unwrap_or_else(|| {
+                if !voting_disabled {
+                    panic!("--tip-distribution-program-pubkey argument required when validator is voting");
+                }
+                Pubkey::new_unique()
+            }),
+        tip_distribution_account_config: TipDistributionAccountConfig {
+            merkle_root_upload_authority: pubkey_of(matches, "merkle_root_upload_authority")
+                .unwrap_or_else(|| {
+                    if !voting_disabled {
+                        panic!("--merkle-root-upload-authority argument required when validator is voting");
+                    }
+                    Pubkey::new_unique()
+                }),
+            vote_account: pubkey_of(matches, "vote_account").unwrap_or_else(|| {
+                if !voting_disabled {
+                    panic!("--vote-account argument required when validator is voting");
+                }
+                Pubkey::new_unique()
+            }),
+            commission_bps: value_t!(matches, "commission_bps", u16).unwrap_or_else(|_| {
+                if !voting_disabled {
+                    panic!("--commission-bps argument required when validator is voting");
+                }
+                0
+            }),
+        },
     }
 }
