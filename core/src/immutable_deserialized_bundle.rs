@@ -8,7 +8,7 @@ use {
     },
     solana_bundle::SanitizedBundle,
     solana_perf::sigverify::verify_packet,
-    solana_runtime::bank::Bank,
+    solana_runtime::{bank::Bank, verify_precompiles::verify_precompiles},
     solana_runtime_transaction::runtime_transaction::RuntimeTransaction,
     solana_sdk::{
         clock::MAX_PROCESSING_AGE, pubkey::Pubkey, signature::Signature,
@@ -56,6 +56,9 @@ pub enum DeserializedBundleError {
 
     #[error("PacketFilterFailure: {0}")]
     PacketFilterFailure(#[from] PacketFilterFailure),
+
+    #[error("Failed to verify precompiles")]
+    FailedVerifyPrecompiles,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -122,6 +125,7 @@ impl ImmutableDeserializedBundle {
         bank: &Bank,
         blacklisted_accounts: &HashSet<Pubkey>,
         transaction_error_metrics: &mut TransactionErrorMetrics,
+        move_precompile_verification_to_svm: bool,
     ) -> Result<SanitizedBundle, DeserializedBundleError> {
         if bank.vote_only_bank() {
             return Err(DeserializedBundleError::VoteOnlyMode);
@@ -174,6 +178,13 @@ impl ImmutableDeserializedBundle {
             return Err(DeserializedBundleError::FailedCheckTransactions);
         }
 
+        if !move_precompile_verification_to_svm {
+            for tx in &transactions {
+                verify_precompiles(tx, &bank.feature_set)
+                    .map_err(|_| DeserializedBundleError::FailedVerifyPrecompiles)?;
+            }
+        }
+
         Ok(SanitizedBundle {
             transactions,
             bundle_id: self.bundle_id.clone(),
@@ -197,14 +208,17 @@ mod tests {
         },
         solana_sdk::{
             hash::Hash,
+            instruction::Instruction,
             packet::Packet,
             pubkey::Pubkey,
             signature::{Keypair, Signer},
             system_transaction::transfer,
+            transaction::Transaction,
         },
         solana_svm::transaction_error_metrics::TransactionErrorMetrics,
         std::{collections::HashSet, sync::Arc},
     };
+
     /// Happy case
     #[test]
     fn test_simple_get_sanitized_bundle() {
@@ -236,7 +250,7 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         let sanitized_bundle = bundle
-            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors)
+            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors, false)
             .unwrap();
         assert_eq!(sanitized_bundle.transactions.len(), 2);
         assert_eq!(
@@ -370,7 +384,8 @@ mod tests {
             bundle.build_sanitized_bundle(
                 &vote_only_bank,
                 &HashSet::default(),
-                &mut transaction_errors
+                &mut transaction_errors,
+                false
             ),
             Err(DeserializedBundleError::VoteOnlyMode)
         );
@@ -404,7 +419,12 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::DuplicateTransaction)
         );
     }
@@ -437,7 +457,8 @@ mod tests {
             bundle.build_sanitized_bundle(
                 &bank,
                 &HashSet::from([kp.pubkey()]),
-                &mut transaction_errors
+                &mut transaction_errors,
+                false
             ),
             Err(DeserializedBundleError::BlacklistedAccount)
         );
@@ -470,7 +491,12 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::FailedCheckTransactions)
         );
     }
@@ -500,8 +526,107 @@ mod tests {
 
         let mut transaction_errors = TransactionErrorMetrics::default();
         assert_matches!(
-            bundle.build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors),
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
             Err(DeserializedBundleError::FailedCheckTransactions)
         );
+    }
+
+    #[test]
+    fn test_bad_ed25519_program_precompile() {
+        let GenesisConfigInfo {
+            genesis_config,
+            mint_keypair,
+            ..
+        } = create_genesis_config(10_000);
+        let (bank, _) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);
+
+        let tx = Transaction::new_signed_with_payer(
+            &[Instruction {
+                program_id: solana_sdk::ed25519_program::id(),
+                accounts: vec![],
+                data: vec![], // empty data is invalid
+            }],
+            Some(&mint_keypair.pubkey()),
+            &[&mint_keypair],
+            genesis_config.hash(),
+        );
+
+        let bundle = ImmutableDeserializedBundle::new(
+            &mut PacketBundle {
+                batch: PacketBatch::new(vec![Packet::from_data(None, tx).unwrap()]),
+                bundle_id: String::default(),
+            },
+            None,
+            &Ok,
+        )
+        .unwrap();
+
+        let mut transaction_errors = TransactionErrorMetrics::default();
+        assert_matches!(
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
+            Err(DeserializedBundleError::FailedVerifyPrecompiles)
+        );
+
+        // move precompile to SVM ignores the check
+        assert!(bundle
+            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors, true)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_bad_secp256k1_program_precompile() {
+        let GenesisConfigInfo {
+            genesis_config,
+            mint_keypair,
+            ..
+        } = create_genesis_config(10_000);
+        let (bank, _) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);
+
+        let tx = Transaction::new_signed_with_payer(
+            &[Instruction {
+                program_id: solana_sdk::secp256k1_program::id(),
+                accounts: vec![],
+                data: vec![], // empty data is invalid
+            }],
+            Some(&mint_keypair.pubkey()),
+            &[&mint_keypair],
+            genesis_config.hash(),
+        );
+
+        let bundle = ImmutableDeserializedBundle::new(
+            &mut PacketBundle {
+                batch: PacketBatch::new(vec![Packet::from_data(None, tx).unwrap()]),
+                bundle_id: String::default(),
+            },
+            None,
+            &Ok,
+        )
+        .unwrap();
+
+        let mut transaction_errors = TransactionErrorMetrics::default();
+        assert_matches!(
+            bundle.build_sanitized_bundle(
+                &bank,
+                &HashSet::default(),
+                &mut transaction_errors,
+                false
+            ),
+            Err(DeserializedBundleError::FailedVerifyPrecompiles)
+        );
+
+        // move precompile to SVM ignores the check
+        assert!(bundle
+            .build_sanitized_bundle(&bank, &HashSet::default(), &mut transaction_errors, true)
+            .is_ok());
     }
 }
