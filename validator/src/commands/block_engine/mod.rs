@@ -28,7 +28,7 @@ pub fn command(_default_args: &DefaultArgs) -> App<'_, '_> {
 pub fn execute(subcommand_matches: &ArgMatches, ledger_path: &Path) {
     let block_engine_url = value_t_or_exit!(subcommand_matches, "block_engine_url", String);
     let trust_packets = subcommand_matches.is_present("trust_block_engine_packets");
-    let admin_client = admin_rpc_service::connect(&ledger_path);
+    let admin_client = admin_rpc_service::connect(ledger_path);
     admin_rpc_service::runtime()
         .block_on(async move {
             admin_client

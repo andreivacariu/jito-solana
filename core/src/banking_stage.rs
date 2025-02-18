@@ -1356,13 +1356,12 @@ mod tests {
         // check that the balance is what we expect.
         let entries: Vec<_> = entry_receiver
             .iter()
-            .map(
+            .flat_map(
                 |WorkingBankEntry {
                      bank: _,
                      entries_ticks,
                  }| entries_ticks.into_iter().map(|e| e.0),
             )
-            .flatten()
             .collect();
 
         let (bank, _bank_forks) = Bank::new_no_wallclock_throttle_for_tests(&genesis_config);

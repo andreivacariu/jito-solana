@@ -49,7 +49,7 @@ pub fn execute(subcommand_matches: &ArgMatches, ledger_path: &Path) {
         value_of(subcommand_matches, "relayer_expected_heartbeat_interval_ms").unwrap();
     let max_failed_heartbeats: u64 =
         value_of(subcommand_matches, "relayer_max_failed_heartbeats").unwrap();
-    let admin_client = admin_rpc_service::connect(&ledger_path);
+    let admin_client = admin_rpc_service::connect(ledger_path);
     admin_rpc_service::runtime()
         .block_on(async move {
             admin_client
@@ -66,5 +66,4 @@ pub fn execute(subcommand_matches: &ArgMatches, ledger_path: &Path) {
             println!("set relayer config failed: {}", err);
             exit(1);
         });
-    return;
 }

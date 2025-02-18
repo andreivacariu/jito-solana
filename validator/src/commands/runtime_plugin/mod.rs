@@ -52,7 +52,7 @@ pub fn command(_default_args: &DefaultArgs) -> App<'_, '_> {
 }
 
 pub fn execute(plugin_subcommand_matches: &ArgMatches, ledger_path: &Path) {
-    let runtime_plugin_rpc_client = runtime_plugin_admin_rpc_service::connect(&ledger_path);
+    let runtime_plugin_rpc_client = runtime_plugin_admin_rpc_service::connect(ledger_path);
     let runtime = Runtime::new().unwrap();
     match plugin_subcommand_matches.subcommand() {
         ("list", _) => {
@@ -70,7 +70,6 @@ pub fn execute(plugin_subcommand_matches: &ArgMatches, ledger_path: &Path) {
             } else {
                 println!("There are currently no plugins loaded");
             }
-            return;
         }
         ("unload", Some(subcommand_matches)) => {
             if let Ok(name) = value_t!(subcommand_matches, "name", String) {
@@ -87,7 +86,6 @@ pub fn execute(plugin_subcommand_matches: &ArgMatches, ledger_path: &Path) {
                     });
                 println!("Successfully unloaded plugin: {name}");
             }
-            return;
         }
         ("load", Some(subcommand_matches)) => {
             if let Ok(config) = value_t!(subcommand_matches, "config", String) {
@@ -104,7 +102,6 @@ pub fn execute(plugin_subcommand_matches: &ArgMatches, ledger_path: &Path) {
                     });
                 println!("Successfully loaded plugin: {name}");
             }
-            return;
         }
         ("reload", Some(subcommand_matches)) => {
             if let Ok(name) = value_t!(subcommand_matches, "name", String) {
@@ -130,7 +127,6 @@ pub fn execute(plugin_subcommand_matches: &ArgMatches, ledger_path: &Path) {
                     println!("Successfully reloaded plugin: {name}");
                 }
             }
-            return;
         }
         _ => unreachable!(),
     }

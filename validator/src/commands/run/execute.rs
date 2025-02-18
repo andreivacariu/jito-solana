@@ -652,11 +652,11 @@ pub fn execute(
 
     let voting_disabled = matches.is_present("no_voting") || restricted_repair_only_mode;
 
-    let tip_manager_config = tip_manager_config_from_matches(&matches, voting_disabled);
+    let tip_manager_config = tip_manager_config_from_matches(matches, voting_disabled);
 
     let block_engine_config = Arc::new(Mutex::new(BlockEngineConfig {
         block_engine_url: if matches.is_present("block_engine_url") {
-            value_of(&matches, "block_engine_url").expect("couldn't parse block_engine_url")
+            value_of(matches, "block_engine_url").expect("couldn't parse block_engine_url")
         } else {
             "".to_string()
         },
@@ -665,12 +665,12 @@ pub fn execute(
 
     // Defaults are set in cli definition, safe to use unwrap() here
     let expected_heartbeat_interval_ms: u64 =
-        value_of(&matches, "relayer_expected_heartbeat_interval_ms").unwrap();
+        value_of(matches, "relayer_expected_heartbeat_interval_ms").unwrap();
     assert!(
         expected_heartbeat_interval_ms > 0,
         "relayer-max-failed-heartbeats must be greater than zero"
     );
-    let max_failed_heartbeats: u64 = value_of(&matches, "relayer_max_failed_heartbeats").unwrap();
+    let max_failed_heartbeats: u64 = value_of(matches, "relayer_max_failed_heartbeats").unwrap();
     assert!(
         max_failed_heartbeats > 0,
         "relayer-max-failed-heartbeats must be greater than zero"
@@ -678,7 +678,7 @@ pub fn execute(
 
     let relayer_config = Arc::new(Mutex::new(RelayerConfig {
         relayer_url: if matches.is_present("relayer_url") {
-            value_of(&matches, "relayer_url").expect("couldn't parse relayer_url")
+            value_of(matches, "relayer_url").expect("couldn't parse relayer_url")
         } else {
             "".to_string()
         },
@@ -855,7 +855,7 @@ pub fn execute(
         shred_receiver_address,
         shred_retransmit_receiver_address,
         tip_manager_config,
-        preallocated_bundle_cost: value_of(&matches, "preallocated_bundle_cost")
+        preallocated_bundle_cost: value_of(matches, "preallocated_bundle_cost")
             .expect("preallocated_bundle_cost set as default"),
         ..ValidatorConfig::default()
     };
