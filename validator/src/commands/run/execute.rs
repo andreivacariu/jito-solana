@@ -650,6 +650,57 @@ pub fn execute(
 
     let full_api = matches.is_present("full_rpc_api");
 
+    let voting_disabled = matches.is_present("no_voting") || restricted_repair_only_mode;
+
+    let tip_manager_config = tip_manager_config_from_matches(&matches, voting_disabled);
+
+    let block_engine_config = Arc::new(Mutex::new(BlockEngineConfig {
+        block_engine_url: if matches.is_present("block_engine_url") {
+            value_of(&matches, "block_engine_url").expect("couldn't parse block_engine_url")
+        } else {
+            "".to_string()
+        },
+        trust_packets: matches.is_present("trust_block_engine_packets"),
+    }));
+
+    // Defaults are set in cli definition, safe to use unwrap() here
+    let expected_heartbeat_interval_ms: u64 =
+        value_of(&matches, "relayer_expected_heartbeat_interval_ms").unwrap();
+    assert!(
+        expected_heartbeat_interval_ms > 0,
+        "relayer-max-failed-heartbeats must be greater than zero"
+    );
+    let max_failed_heartbeats: u64 = value_of(&matches, "relayer_max_failed_heartbeats").unwrap();
+    assert!(
+        max_failed_heartbeats > 0,
+        "relayer-max-failed-heartbeats must be greater than zero"
+    );
+
+    let relayer_config = Arc::new(Mutex::new(RelayerConfig {
+        relayer_url: if matches.is_present("relayer_url") {
+            value_of(&matches, "relayer_url").expect("couldn't parse relayer_url")
+        } else {
+            "".to_string()
+        },
+        expected_heartbeat_interval: Duration::from_millis(expected_heartbeat_interval_ms),
+        oldest_allowed_heartbeat: Duration::from_millis(
+            max_failed_heartbeats * expected_heartbeat_interval_ms,
+        ),
+        trust_packets: matches.is_present("trust_relayer_packets"),
+    }));
+
+    let shred_receiver_address =
+        Arc::new(RwLock::new(matches.value_of("shred_receiver_address").map(
+            |addr| SocketAddr::from_str(addr).expect("shred_receiver_address invalid"),
+        )));
+    let shred_retransmit_receiver_address = Arc::new(RwLock::new(
+        matches
+            .value_of("shred_retransmit_receiver_address")
+            .map(|addr| {
+                SocketAddr::from_str(addr).expect("shred_retransmit_receiver_address invalid")
+            }),
+    ));
+
     let mut validator_config = ValidatorConfig {
         require_tower: matches.is_present("require_tower"),
         tower_storage,
@@ -728,7 +779,7 @@ pub fn execute(
                 .ok()
                 .and_then(NonZeroUsize::new),
         },
-        voting_disabled: matches.is_present("no_voting") || restricted_repair_only_mode,
+        voting_disabled,
         wait_for_supermajority: value_t!(matches, "wait_for_supermajority", Slot).ok(),
         known_validators,
         repair_validators,
@@ -798,12 +849,14 @@ pub fn execute(
             .is_present("delay_leader_block_for_pending_fork"),
         wen_restart_proto_path: value_t!(matches, "wen_restart", PathBuf).ok(),
         wen_restart_coordinator: value_t!(matches, "wen_restart_coordinator", Pubkey).ok(),
-        // pub relayer_config: Arc<Mutex<RelayerConfig>>,
-        // pub block_engine_config: Arc<Mutex<BlockEngineConfig>>,
-        // pub shred_receiver_address: Arc<RwLock<Option<SocketAddr>>>,
-        // pub shred_retransmit_receiver_address: Arc<RwLock<Option<SocketAddr>>>,
-        // pub tip_manager_config: TipManagerConfig,
-        // pub preallocated_bundle_cost: u64,
+        // jito config
+        relayer_config,
+        block_engine_config,
+        shred_receiver_address,
+        shred_retransmit_receiver_address,
+        tip_manager_config,
+        preallocated_bundle_cost: value_of(&matches, "preallocated_bundle_cost")
+            .expect("preallocated_bundle_cost set as default"),
         ..ValidatorConfig::default()
     };
 

@@ -323,6 +323,8 @@ pub struct ValidatorConfig {
     pub tvu_shred_sigverify_threads: NonZeroUsize,
     pub thread_manager_config: ThreadManagerConfig,
     pub delay_leader_block_for_pending_fork: bool,
+
+    // jito configuration
     pub relayer_config: Arc<Mutex<RelayerConfig>>,
     pub block_engine_config: Arc<Mutex<BlockEngineConfig>>,
     pub shred_receiver_address: Arc<RwLock<Option<SocketAddr>>>,
@@ -408,7 +410,7 @@ impl Default for ValidatorConfig {
             shred_receiver_address: Arc::new(RwLock::new(None)),
             shred_retransmit_receiver_address: Arc::new(RwLock::new(None)),
             tip_manager_config: TipManagerConfig::default(),
-            preallocated_bundle_cost: u64::default(),
+            preallocated_bundle_cost: 0,
         }
     }
 }
