@@ -1,7 +1,3 @@
-use solana_core::proxy::block_engine_stage::BlockEngineConfig;
-use solana_core::proxy::relayer_stage::RelayerConfig;
-use solana_core::tip_manager::{TipDistributionAccountConfig, TipManagerConfig};
-use std::sync::Mutex;
 use {
     crate::{
         admin_rpc_service,
@@ -30,7 +26,9 @@ use {
     solana_core::{
         banking_trace::DISABLED_BAKING_TRACE_DIR,
         consensus::tower_storage,
+        proxy::{block_engine_stage::BlockEngineConfig, relayer_stage::RelayerConfig},
         system_monitor_service::SystemMonitorService,
+        tip_manager::{TipDistributionAccountConfig, TipManagerConfig},
         tpu::DEFAULT_TPU_COALESCE,
         validator::{
             is_snapshot_config_valid, BlockProductionMethod, BlockVerificationMethod,
@@ -79,7 +77,7 @@ use {
         path::{Path, PathBuf},
         process::exit,
         str::FromStr,
-        sync::{Arc, RwLock},
+        sync::{Arc, Mutex, RwLock},
         time::Duration,
     },
 };

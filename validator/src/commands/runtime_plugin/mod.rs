@@ -1,11 +1,9 @@
-use clap::value_t;
-use solana_runtime_plugin::runtime_plugin_admin_rpc_service;
-use std::process::exit;
-use tokio::runtime::Runtime;
 use {
     crate::cli::DefaultArgs,
-    clap::{App, AppSettings, Arg, ArgMatches, SubCommand},
-    std::path::Path,
+    clap::{value_t, App, AppSettings, Arg, ArgMatches, SubCommand},
+    solana_runtime_plugin::runtime_plugin_admin_rpc_service,
+    std::{path::Path, process::exit},
+    tokio::runtime::Runtime,
 };
 
 pub fn command(_default_args: &DefaultArgs) -> App<'_, '_> {

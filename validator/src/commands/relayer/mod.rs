@@ -1,11 +1,8 @@
-use crate::admin_rpc_service;
-use clap::value_t_or_exit;
-use solana_clap_utils::input_parsers::value_of;
-use std::process::exit;
 use {
-    crate::cli::DefaultArgs,
-    clap::{App, Arg, ArgMatches, SubCommand},
-    std::path::Path,
+    crate::{admin_rpc_service, cli::DefaultArgs},
+    clap::{value_t_or_exit, App, Arg, ArgMatches, SubCommand},
+    solana_clap_utils::input_parsers::value_of,
+    std::{path::Path, process::exit},
 };
 
 pub fn command(default_args: &DefaultArgs) -> App<'_, '_> {
